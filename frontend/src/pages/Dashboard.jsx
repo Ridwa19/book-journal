@@ -1,208 +1,344 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api } from "../api.js";
-import { useAuth } from "../context/AuthContext.jsx";
+import { useState } from "react";
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
-const ICONS = {
-  reading: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5C4.67 20 4 19.33 4 18.5V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-      <path d="M20 5.5C20 4.67 19.33 4 18.5 4H13v16h5.5c.83 0 1.5-.67 1.5-1.5V5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-    </svg>
-  ),
-  finished: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M4 12.5 9.5 18 20 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  ),
-  wishlist: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M12 20s-7.5-4.8-10-9.4C.5 6.8 2.7 4 6 4c2 0 3.7 1.1 4.5 2.6l1.5 2.7 1.5-2.7C14.3 5.1 16 4 18 4c3.3 0 5.5 2.8 4 6.6C19.5 15.2 12 20 12 20Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-    </svg>
-  ),
-  total: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <rect x="4" y="3" width="16" height="18" rx="1.6" stroke="currentColor" strokeWidth="1.6"/>
-      <path d="M8 3v18M8 8h8M8 13h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-    </svg>
-  ),
-};
+const monthlyData = [
+  { month: "Jan", books: 4 },
+  { month: "Feb", books: 6 },
+  { month: "Mar", books: 3 },
+  { month: "Apr", books: 5 },
+  { month: "May", books: 4 },
+  { month: "Jun", books: 7 },
+  { month: "Jul", books: 2 },
+];
 
-function ProgressRing({ pct, size = 108 }) {
-  const stroke = 9;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const offset = c - (pct / 100) * c;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--line)" strokeWidth={stroke} fill="none" />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        stroke="var(--terracotta)"
-        strokeWidth={stroke}
-        fill="none"
-        strokeLinecap="round"
-        strokeDasharray={c}
-        strokeDashoffset={offset}
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        style={{ transition: "stroke-dashoffset 0.6s ease" }}
-      />
-      <text
-        x="50%"
-        y="50%"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontFamily="var(--font-display)"
-        fontSize="22"
-        fill="var(--ink)"
-      >
-        {pct}%
-      </text>
-    </svg>
-  );
-}
+const dailyData = [
+  { day: "Jun 28", pages: 45 },
+  { day: "Jun 29", pages: 32 },
+  { day: "Jun 30", pages: 58 },
+  { day: "Jul 1", pages: 41 },
+  { day: "Jul 2", pages: 67 },
+  { day: "Jul 3", pages: 23 },
+  { day: "Jul 4", pages: 55 },
+];
+
+const genreData = [
+  { name: "Romance", value: 35, color: "#E91E63" },
+  { name: "Action", value: 20, color: "#9C27B0" },
+  { name: "Horror", value: 15, color: "#4CAF50" },
+  { name: "Adventure", value: 10, color: "#FF9800" },
+  { name: "Fantasy", value: 10, color: "#2196F3" },
+  { name: "Other", value: 10, color: "#607D8B" },
+];
+
+const recentActivity = [
+  { title: "Qalbiga Iyo Nafteyda", pages: 120, time: "2 hours ago", icon: "📖" },
+  { title: "Jacaylka Aan Raadinayey", pages: 45, time: "Yesterday", icon: "📖" },
+  { title: "Xusuustii Aan Ilaawein", pages: null, time: "2 days ago", icon: "✅", completed: true },
+];
+
+const weeklyStreak = [
+  { day: "Mon", completed: true },
+  { day: "Tue", completed: true },
+  { day: "Wed", completed: true },
+  { day: "Thu", completed: true },
+  { day: "Fri", completed: true },
+  { day: "Sat", completed: true },
+  { day: "Sun", completed: false },
+];
+
+const calendarData = Array.from({ length: 35 }, (_, i) => ({
+  day: i + 1,
+  activity: Math.random() > 0.5 ? Math.floor(Math.random() * 4) : 0,
+}));
 
 export default function Dashboard() {
-  const { token, user } = useAuth();
-  const [overview, setOverview] = useState(null);
-  const [recentBooks, setRecentBooks] = useState([]);
-  const [currentlyReading, setCurrentlyReading] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([api.getOverview(token), api.getBooks(token), api.getBooks(token, "Reading Now")])
-      .then(([ov, books, reading]) => {
-        setOverview(ov);
-        setRecentBooks(books.books.slice(0, 6));
-        setCurrentlyReading(reading.books.slice(0, 1));
-      })
-      .finally(() => setLoading(false));
-  }, [token]);
-
-  if (loading) return <div className="loading-state">Loading your dashboard...</div>;
-
-  const pct = overview.readingGoal
-    ? Math.min(100, Math.round((overview.finishedThisYear / overview.readingGoal) * 100))
-    : 0;
-  const spotlight = currentlyReading[0];
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <div className="page">
-      {/* Hero */}
-      <div className="dash-hero">
-        <div>
-          <p className="dash-eyebrow">{greeting}</p>
-          <h1 className="dash-title">
-            {user?.name?.split(" ")[0]}'s <span>reading life</span>
-          </h1>
-          <p className="dash-sub">
-            {overview.finishedThisYear === 0
-              ? "No books finished yet this year — let's change that."
-              : `You've finished ${overview.finishedThisYear} book${overview.finishedThisYear === 1 ? "" : "s"} so far this year.`}
-          </p>
-          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            <Link to="/search" className="btn btn-primary">Find a book</Link>
-            <Link to="/bookcase" className="btn btn-ghost">Open bookcase</Link>
+    <>
+      {/* Top Bar */}
+      <div className="top-bar">
+        <div className="top-bar-left">
+          <button className="menu-toggle">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12h18M3 6h18M3 18h18" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <div className="search-container">
+            <span className="search-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
+              </svg>
+            </span>
+            <input
+              type="text"
+              placeholder="Search books, authors, ISBN, genre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <span className="search-shortcut">⌘K</span>
           </div>
         </div>
-        <div className="dash-ring-card">
-          <ProgressRing pct={pct} />
-          <div style={{ textAlign: "center", marginTop: 8 }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>
-              {overview.finishedThisYear} / {overview.readingGoal}
+        <div className="top-bar-right">
+          <button className="notification-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span className="notification-badge"></span>
+          </button>
+          <div className="user-profile">
+            <div className="user-avatar">ER</div>
+            <div className="user-info">
+              <div className="user-name">E-Ridwan</div>
+              <div className="user-title">Book Lover</div>
             </div>
-            <div className="stat-label" style={{ marginTop: 2 }}>reading goal</div>
+          </div>
+          <div className="date-picker">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Sabti, 4 Jul 2025
           </div>
         </div>
       </div>
 
-      {/* Spotlight: currently reading */}
-      {spotlight && (
-        <Link to={`/book/${spotlight._id}`} className="spotlight-card">
-          {spotlight.coverUrl ? (
-            <img src={spotlight.coverUrl} alt={spotlight.title} className="spotlight-cover" />
-          ) : (
-            <div className="book-cover-placeholder spotlight-cover">{spotlight.title}</div>
-          )}
-          <div>
-            <div className="stat-label">Currently reading</div>
-            <div className="spotlight-title">{spotlight.title}</div>
-            <div className="spotlight-author">{spotlight.author}</div>
-            <span className="spotlight-cta">Continue journaling →</span>
+      {/* Dashboard Content */}
+      <div className="dashboard-container">
+        {/* Stats Row */}
+        <div className="stats-row">
+          <div className="stat-card-mini">
+            <div className="icon" style={{ background: "rgba(233, 30, 99, 0.2)", color: "#E91E63" }}>📚</div>
+            <div className="value">48</div>
+            <div className="label">Wadarta Buugaagta</div>
           </div>
-        </Link>
-      )}
+          <div className="stat-card-mini">
+            <div className="icon" style={{ background: "rgba(76, 175, 80, 0.2)", color: "#4CAF50" }}>✅</div>
+            <div className="value">16</div>
+            <div className="label">La Dhammaystay</div>
+          </div>
+          <div className="stat-card-mini">
+            <div className="icon" style={{ background: "rgba(156, 39, 176, 0.2)", color: "#9C27B0" }}>📖</div>
+            <div className="value">5</div>
+            <div className="label">Hadda Akhrinaya</div>
+          </div>
+          <div className="stat-card-mini">
+            <div className="icon" style={{ background: "rgba(255, 152, 0, 0.2)", color: "#FF9800" }}>⭐</div>
+            <div className="value">27</div>
+            <div className="label">La Akhrin Doono</div>
+          </div>
+          <div className="stat-card-mini">
+            <div className="icon" style={{ background: "rgba(244, 67, 54, 0.2)", color: "#F44336" }}>🔥</div>
+            <div className="value">12</div>
+            <div className="label">Streak</div>
+          </div>
+          <div className="stat-card-mini">
+            <div className="icon" style={{ background: "rgba(33, 150, 243, 0.2)", color: "#2196F3" }}>📄</div>
+            <div className="value">3,245</div>
+            <div className="label">Bogagga La Akhriyey</div>
+          </div>
+        </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-4 dash-stats">
-        <div className="card stat-card">
-          <div className="stat-icon">{ICONS.reading}</div>
-          <div>
-            <div className="stat-value">{overview.shelfCounts["Reading Now"]}</div>
-            <div className="stat-label">Reading now</div>
+        {/* Charts Row */}
+        <div className="charts-row">
+          <div className="chart-card">
+            <h3>Buugaagta Bishii</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="month" stroke="#A0A0A0" />
+                <YAxis stroke="#A0A0A0" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#1A1A1A", border: "1px solid #333", borderRadius: "8px" }}
+                  itemStyle={{ color: "#fff" }}
+                />
+                <Bar dataKey="books" fill="#E91E63" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-card">
+            <h3>Bogagga Maalin Kasta</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={dailyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="day" stroke="#A0A0A0" />
+                <YAxis stroke="#A0A0A0" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#1A1A1A", border: "1px solid #333", borderRadius: "8px" }}
+                  itemStyle={{ color: "#fff" }}
+                />
+                <Line type="monotone" dataKey="pages" stroke="#9C27B0" strokeWidth={2} dot={{ fill: "#9C27B0" }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-card">
+            <h3>Noocyada Buugaagta</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={genreData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50}
+                  outerRadius={70}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {genreData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: "#1A1A1A", border: "1px solid #333", borderRadius: "8px" }}
+                  itemStyle={{ color: "#fff" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "12px", justifyContent: "center" }}>
+              {genreData.map((item) => (
+                <div key={item.name} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: item.color }}></div>
+                  <span style={{ color: "#A0A0A0" }}>{item.name} {item.value}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="card stat-card">
-          <div className="stat-icon" style={{ color: "var(--green)" }}>{ICONS.finished}</div>
-          <div>
-            <div className="stat-value" style={{ color: "var(--green)" }}>{overview.shelfCounts["Finished"]}</div>
-            <div className="stat-label">Finished</div>
-          </div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-icon">{ICONS.wishlist}</div>
-          <div>
-            <div className="stat-value">{overview.shelfCounts["Wishlist"]}</div>
-            <div className="stat-label">Wishlist</div>
-          </div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-icon">{ICONS.total}</div>
-          <div>
-            <div className="stat-value">{overview.totalBooks}</div>
-            <div className="stat-label">Total in bookcase</div>
-          </div>
-        </div>
-      </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, marginTop: 8 }}>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, margin: 0 }}>
-          Recently added
-        </h2>
-        <Link to="/bookcase" style={{ fontSize: 13, color: "var(--terracotta)", fontWeight: 600 }}>
-          View bookcase →
-        </Link>
-      </div>
-
-      {recentBooks.length === 0 ? (
-        <div className="empty-state card">
-          <h3>Your bookcase is empty</h3>
-          <p>Search for a book to add your first entry.</p>
-          <Link to="/search" className="btn btn-primary" style={{ display: "inline-block", marginTop: 14 }}>
-            Find a book
-          </Link>
+        {/* Monthly Goal Progress */}
+        <div className="card" style={{ marginBottom: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0, color: "var(--text-primary)" }}>
+              Hadafka Akhriska Bishan
+            </h3>
+            <span style={{ fontSize: "14px", color: "var(--text-secondary)" }}>3,920 / 5,000 bog</span>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: "78%" }}></div>
+          </div>
+          <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-secondary)" }}>78% complete</div>
         </div>
-      ) : (
-        <div className="book-grid">
-          {recentBooks.map((b) => (
-            <Link to={`/book/${b._id}`} key={b._id} className="book-card">
-              {b.coverUrl ? (
-                <img className="book-cover" src={b.coverUrl} alt={b.title} />
-              ) : (
-                <div className="book-cover-placeholder">{b.title}</div>
-              )}
-              <div className="book-info">
-                <div className="title">{b.title}</div>
-                <div className="author">{b.author}</div>
+
+        {/* Reading Streak */}
+        <div className="card" style={{ marginBottom: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: 0, color: "var(--text-primary)" }}>
+              Reading Streak
+            </h3>
+            <span style={{ fontSize: "14px", color: "var(--accent-orange)", fontWeight: "600" }}>🔥 12 days</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "8px" }}>
+            {weeklyStreak.map((day) => (
+              <div
+                key={day.day}
+                style={{
+                  flex: 1,
+                  padding: "12px 8px",
+                  background: day.completed ? "rgba(76, 175, 80, 0.2)" : "var(--bg-card-light)",
+                  border: day.completed ? "1px solid #4CAF50" : "1px solid var(--border)",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                  fontSize: "12px",
+                  color: day.completed ? "#4CAF50" : "var(--text-secondary)",
+                }}
+              >
+                {day.day}
+                <div style={{ marginTop: "4px", fontSize: "16px" }}>{day.completed ? "✓" : "○"}</div>
               </div>
-            </Link>
-          ))}
+            ))}
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* Calendar Heatmap */}
+        <div className="card" style={{ marginBottom: "24px" }}>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: "16px", margin: "0 0 16px 0", color: "var(--text-primary)" }}>
+            Reading Calendar - July 2025
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "6px" }}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+              <div key={day} style={{ textAlign: "center", fontSize: "11px", color: "var(--text-secondary)", padding: "4px" }}>
+                {day}
+              </div>
+            ))}
+            {calendarData.map((item) => (
+              <div
+                key={item.day}
+                style={{
+                  aspectRatio: "1",
+                  background: item.activity === 0 ? "var(--bg-card-light)" : 
+                               item.activity === 1 ? "rgba(76, 175, 80, 0.3)" :
+                               item.activity === 2 ? "rgba(76, 175, 80, 0.6)" :
+                               "rgba(76, 175, 80, 0.9)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "11px",
+                  color: item.activity > 0 ? "#fff" : "var(--text-secondary)",
+                }}
+              >
+                {item.day}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Row */}
+        <div className="bottom-row">
+          {/* Recent Activity */}
+          <div className="activity-card">
+            <h3>Waxqabadkii Ugu Dambeeyay</h3>
+            {recentActivity.map((item, index) => (
+              <div key={index} className="activity-item">
+                <div className="activity-icon">{item.icon}</div>
+                <div className="activity-details">
+                  <div className="activity-title">{item.title}</div>
+                  <div className="activity-meta">
+                    {item.completed ? "Completed" : `${item.pages} pages`} • {item.time}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Currently Reading */}
+          <div className="currently-reading-card">
+            <h3>Hadda Aad Akhrinayso</h3>
+            <div className="book-preview">
+              <div className="book-preview-cover">
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>📖</div>
+                  Book Cover
+                </div>
+              </div>
+              <div>
+                <div className="book-preview-title">Jacaylka Aan Raadinaayey</div>
+                <div className="book-preview-author">Unknown</div>
+                <div className="book-preview-rating">
+                  {"★".repeat(4)}<span style={{ color: "var(--border)" }}>★</span>
+                  <span style={{ color: "var(--text-secondary)", marginLeft: "4px" }}>4.8</span>
+                </div>
+              </div>
+              <div className="book-preview-progress">
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--text-secondary)" }}>
+                  <span>Progress</span>
+                  <span>60%</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: "60%" }}></div>
+                </div>
+                <div className="book-preview-pages">240 / 400 bog</div>
+              </div>
+              <button className="continue-btn">Sii Akhri</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

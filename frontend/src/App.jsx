@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
-import Navbar from "./components/Navbar.jsx";
+import Sidebar from "./components/Sidebar.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -15,8 +15,10 @@ function Protected({ children }) {
   if (!token) return <Navigate to="/login" replace />;
   return (
     <div className="app-shell">
-      <Navbar />
-      {children}
+      <Sidebar />
+      <div className="main-content">
+        {children}
+      </div>
     </div>
   );
 }
